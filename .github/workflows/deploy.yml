@@ -1,0 +1,71 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (placeholder, skipped)
+        if: ${{ false }}
+        run: echo "This step is intentionally skipped using a static false condition"
+
+      - name: Prepare deploy key
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          echo "Writing SSH key to /tmp/deploy_key"
+          mkdir -p /tmp/ssh
+          echo "$SERVER_SSH_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+      - name: Add server to known_hosts
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          # Ensure we can SSH without prompt
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts || true
+
+      - name: Deploy via SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          BRANCH_NAME: ${{ secrets.BRANCH_NAME }}
+        # Only run deploy when push is to the configured branch
+        if: github.ref == format('refs/heads/{0}', env.BRANCH_NAME)
+        run: |
+          set -e
+          echo "Connecting to $SERVER_HOST as $SERVER_USERNAME"
+
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no $SERVER_USERNAME@$SERVER_HOST << 'EOF'
+          set -e
+          cd "$DEPLOY_PATH"
+          echo "Fetching latest changes"
+          git fetch --all
+          git reset --hard "origin/${BRANCH_NAME}"
+
+          composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:clear
+          php artisan cache:clear
+
+          # Ensure storage symlink exists for public disk (avatars)
+          php artisan storage:link || true
+
+          # Ensure storage permissions (may vary by server)
+          chown -R $SERVER_USERNAME:www-data storage bootstrap/cache || true
+
+          EOF
+
+      - name: Post-deploy placeholder
+        if: ${{ false }}
+        run: echo "Post-deploy tasks skipped (static false)"
