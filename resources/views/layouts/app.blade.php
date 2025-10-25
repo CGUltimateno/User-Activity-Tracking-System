@@ -19,10 +19,8 @@
                                 var currPath = location.pathname.toLowerCase();
                             } catch(e) { var currPath = ''; }
 
-                            // If we are on any users page (index, show, create, edit), prefer the users index as the 'back' target
                             try {
                                 if (currPath.indexOf('/users') === 0) {
-                                    // Prefer a stored users index (so back returns to the list the admin used), otherwise fallback to route
                                     var usersIndex = null;
                                     try { usersIndex = sessionStorage.getItem('usersIndex'); } catch(e) { usersIndex = null; }
                                     if (usersIndex) { window.location = usersIndex; return; }
@@ -30,7 +28,6 @@
                                     return;
                                 }
                             } catch(e) {
-                                // if route helper fails for some reason, fall through
                             }
 
                             try {
@@ -40,8 +37,6 @@
                             } catch(e) {
                                 var ref = null; var refPath = ''; var sameOriginRef = false;
                             }
-
-                            // treat any path containing these tokens as an auth-related page we shouldn't go back to
                             var badTokens = ['login','register','logout','password','verify'];
                             var refIsBad = false;
                             if (refPath) {
@@ -49,7 +44,6 @@
                                 refIsBad = badTokens.some(function(t){ return low.indexOf(t) !== -1; });
                             }
 
-                            // If there's a same-origin referrer and it doesn't look like an auth page, go there explicitly
                             if (sameOriginRef && ref && !refIsBad) {
                                 window.location.href = ref.href;
                                 return;
